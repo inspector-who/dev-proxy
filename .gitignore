@@ -1,0 +1,33 @@
+.npmrc
+.DS_Store
+**.gz
+**.swo
+**.swp
+**.sws
+*.sublime-project
+*.sublime-workspace
+.unison.*.tmp
+*.sql
+/.buildpath
+/.project
+/.settings
+
+# phpstorm project files
+.idea
+.env
+
+# netbeans project files
+nbproject
+
+# zend studio for eclipse project files
+.buildpath
+.project
+.settings
+
+# windows thumbnail cache
+Thumbs.db
+
+gateway/certs/backups/*
+!gateway/certs/backups/.gitkeep
+gateway/certs/*.pem
+gateway/certs/*.bak
