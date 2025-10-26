@@ -82,6 +82,8 @@ Commands:
 Environment:
   TRAEFIK_NETWORK (default: traefik)
   DEV_PROXY_ROOT (optional): absolute path to repo root with dev-proxy/docker-compose.yml
+  TRAEFIK_SUBNET (optional): explicit subnet CIDR for the network (e.g. 10.123.0.0/16)
+  TRAEFIK_SUBNETS (optional): space-separated list of candidate subnets to try
 EOF
 }
 
@@ -94,7 +96,7 @@ _cert_paths() {
 }
 
 _extract_sans() {
-  # Prints SAN host entries (DNS/IP) one per line to stdout; returns 0 even if empty
+  # Prints SAN host entries (DNS/IP) one per line to stdout; includes CN if present
   local cert_file="$1"
   [[ -f "$cert_file" ]] || return 0
   local text
@@ -105,6 +107,15 @@ _extract_sans() {
   # Extract IP entries (two possible labels)
   printf "%s" "$text" | grep -oE 'IP Address:[^,[:space:]]+' | sed 's/^IP Address://' || true
   printf "%s" "$text" | grep -oE '\bIP:[^,[:space:]]+' | sed 's/^IP://' || true
+  # Also include CN (Subject CN) if present
+  local cn
+  cn=$(printf "%s" "$text" | sed -n 's/^\s*Subject:.*CN\s*=\s*\([^,]\+\).*/\1/p' | head -n1 || true)
+  if [[ -z "$cn" ]]; then
+    cn=$(printf "%s" "$text" | sed -n 's/^\s*Subject:.*CN=\([^,]\+\).*/\1/p' | head -n1 || true)
+  fi
+  if [[ -n "$cn" ]]; then
+    echo "$cn"
+  fi
 }
 
 _backup_cert_key() {
@@ -204,12 +215,13 @@ mkcert_cmd() {
           combined+=("$h")
         fi
       done
-      # Detect changes
+      # Detect changes (best-effort)
       if [[ ${#combined[@]} -eq ${#current[@]} ]]; then
-        # Check set equality
         local changed=0
-        for h in "${combined[@]}"; do [[ -z "${seen_check_$h:-}" ]]; done # noop to avoid shellcheck
-        for h in "${current[@]}"; do [[ -n "${seen[$h]:-}" ]] || changed=1; done
+        # check if every current is in combined
+        declare -A in_comb=()
+        for h in "${combined[@]}"; do in_comb[$h]=1; done
+        for h in "${current[@]}"; do [[ -n "${in_comb[$h]:-}" ]] || changed=1; done
         if [[ $changed -eq 0 ]]; then
           echo "No changes: all hosts already present in SAN"
           return 0
@@ -268,11 +280,44 @@ mkcert_cmd() {
 
 ensure_network() {
   echo "Ensuring external network '$TRAEFIK_NETWORK' exists..."
-  if ! docker network inspect "$TRAEFIK_NETWORK" >/dev/null 2>&1; then
-    docker network create "$TRAEFIK_NETWORK" >/dev/null
-    echo "Created network '$TRAEFIK_NETWORK'"
-  else
+  if docker network inspect "$TRAEFIK_NETWORK" >/dev/null 2>&1; then
     echo "Network '$TRAEFIK_NETWORK' already exists"
+    return 0
+  fi
+  # Try create with default settings first
+  if docker network create -d bridge "$TRAEFIK_NETWORK" >/dev/null 2>&1; then
+    echo "Created network '$TRAEFIK_NETWORK'"
+    return 0
+  fi
+  echo "Default network create failed. Will try explicit subnets (IPAM pool exhaustion workaround)..."
+  local CANDIDATE_SUBNETS
+  # Support both a single subnet and a list
+  if [[ -n "${TRAEFIK_SUBNET:-}" ]]; then
+    CANDIDATE_SUBNETS="$TRAEFIK_SUBNET"
+  fi
+  if [[ -n "${TRAEFIK_SUBNETS:-}" ]]; then
+    CANDIDATE_SUBNETS="${CANDIDATE_SUBNETS:+$CANDIDATE_SUBNETS }$TRAEFIK_SUBNETS"
+  fi
+  # Add some defaults if none provided
+  if [[ -z "${CANDIDATE_SUBNETS:-}" ]]; then
+    CANDIDATE_SUBNETS="172.30.0.0/16 172.31.0.0/16 10.10.0.0/16 192.168.100.0/24 10.123.0.0/16"
+  fi
+  local created=0 net
+  for net in $CANDIDATE_SUBNETS; do
+    [[ -z "$net" ]] && continue
+    echo "Trying subnet $net ..."
+    if docker network create -d bridge --subnet "$net" "$TRAEFIK_NETWORK" >/dev/null 2>&1; then
+      echo "Created network '$TRAEFIK_NETWORK' with subnet $net"
+      created=1
+      break
+    fi
+  done
+  if [[ "$created" -ne 1 ]]; then
+    echo "Failed to create network '$TRAEFIK_NETWORK'." >&2
+    echo "Hints:" >&2
+    echo " - Provide a free subnet via TRAEFIK_SUBNET=10.123.0.0/16 dev-proxy network" >&2
+    echo " - Or run 'docker network prune' to clean up unused docker networks and retry" >&2
+    return 1
   fi
 }
 
