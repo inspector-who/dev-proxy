@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: ${TRAEFIK_IMAGE:-traefik:v2.11}
+    image: ${TRAEFIK_IMAGE:-traefik:v3.6}
     restart: unless-stopped
     command:
       - --providers.docker=true
@@ -11,6 +11,7 @@ services:
       - --entrypoints.web.http.redirections.entryPoint.to=websecure
       - --entrypoints.web.http.redirections.entryPoint.scheme=https
       - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls=true
       - --api.insecure=true
       - --log.level=DEBUG
     ports:

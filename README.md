@@ -4,7 +4,7 @@
 Проекты подключаются к внешней сети и объявляют роуты через Docker labels — собственный Traefик в каждом проекте не нужен.
 
 ## Что внутри
-- `docker-compose.yml` — Traefik v2.11, публикация портов 80/443/8081 (значения можно переопределить через `.env`: `TRAEFIK_PORT_HTTP`, `TRAEFIK_PORT_HTTPS`, `TRAEFIK_PORT_DASHBOARD`).
+- `docker-compose.yml` — Traefik v3.6, публикация портов 80/443/8081 (значения можно переопределить через `.env`: `TRAEFIK_PORT_HTTP`, `TRAEFIK_PORT_HTTPS`, `TRAEFIK_PORT_DASHBOARD`).
 - `gateway/dynamic/` — каталог для динамических файловых правил (опционально, можно оставить пустым).
 - `gateway/certs/` — каталог для dev‑сертификатов (опционально).
 

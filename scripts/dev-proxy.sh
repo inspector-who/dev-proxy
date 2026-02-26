@@ -329,8 +329,10 @@ up() {
   local DASHBOARD_PORT="${TRAEFIK_PORT_DASHBOARD:-8081}"
   local HTTP_PORT="${TRAEFIK_PORT_HTTP:-80}"
   local HTTPS_PORT="${TRAEFIK_PORT_HTTPS:-443}"
-  echo "Dashboard: http://localhost:${DASHBOARD_PORT}"
-  echo "Entrypoints: http -> :${HTTP_PORT}, https -> :${HTTPS_PORT}"
+  echo "✅ Traefik is running:"
+  echo "  Dashboard:  http://localhost:${DASHBOARD_PORT}"
+  echo "  HTTP:       http://localhost:${HTTP_PORT} (redirects to https)"
+  echo "  HTTPS:      https://localhost:${HTTPS_PORT}"
 }
 
 down() {

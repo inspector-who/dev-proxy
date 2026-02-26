@@ -2,4 +2,8 @@ tls:
   certificates:
     - certFile: /etc/traefik/certs/dev.pem
       keyFile: /etc/traefik/certs/dev-key.pem
-
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /etc/traefik/certs/dev.pem
+        keyFile: /etc/traefik/certs/dev-key.pem
